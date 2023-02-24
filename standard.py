@@ -109,12 +109,12 @@ class number:
 
 
     def sub(self, s):
-        result = number(s.state)
+        result = number(self.state)
         try:
             for _ in s.state:
                 result = result.dec()
         except:
-            raise("Oops.  You tried to subtract a larger number from a smaller one.  Just natural numbers for now.")
+            raise UnderflowError("Oops.  You tried to subtract a larger number from a smaller one.  Just natural numbers for now.")
 
         return result
 
@@ -280,6 +280,27 @@ def standard_tests():
         pass
     if no_except:
         raise Exception("Did get an UnderflowError when trying to decrement zero")
+
+# subtraction
+    # 0-0=0
+    assert_equal(zero.sub(zero).compare(zero), "equal")
+    # 1-0=1
+    assert_equal(one.sub(zero).compare(one), "equal")
+    # 1-1=0
+    assert_equal(one.sub(one).compare(zero), "equal")
+    # 2-2=0
+    assert_equal(one.sub(one).compare(zero), "equal")
+    # 3-1=2
+    assert_equal(three.sub(one).compare(two), "equal")
+    # 1-2=underflow
+    threw_underflow = False
+    try:
+        one.sub(two)
+    except UnderflowError:
+        threw_underflow = True
+    assert threw_underflow
+
+
 
 # division
     # 0/1 = 0,0
