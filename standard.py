@@ -19,7 +19,15 @@ https://en.wikipedia.org/wiki/Hyperoperation
 
 def assert_equal(a, b):
     if a != b:
-        raise AssertionError(f"{a} does not equal {b}")
+        raise AssertionError(f"{a} is not {b}")
+
+
+class UnderflowError(ArithmeticError):
+    pass
+
+
+class DivideByZeroError(ArithmeticError):
+    pass
 
 
 class number:
@@ -97,7 +105,38 @@ class number:
             self.state[0]
             return number(self.state[1:])
         except:
-            raise("Oops.  You tried to decrement a zero.  Just natural numbers for now.")
+            raise UnderflowError("Oops.  You tried to decrement a zero.  Just natural numbers for now.")
+
+
+    def sub(self, s):
+        result = number(s.state)
+        try:
+            for _ in s.state:
+                result = result.dec()
+        except:
+            raise("Oops.  You tried to subtract a larger number from a smaller one.  Just natural numbers for now.")
+
+        return result
+
+
+    def div(self, denominator):
+        numerator = number(self.state)
+        divisions = number.create_zero()
+        if denominator.compare(number.create_zero()) == "equal":
+            raise DivideByZeroError()
+        try:
+            while True:
+                progress = number.create_zero()
+                for _ in denominator.state:
+                    numerator = numerator.dec()
+                    progress = progress.inc()
+                divisions = divisions.inc()
+        except UnderflowError:
+            return divisions, progress
+
+
+
+
 
     def compare(self, b):
         for _ in self.state:
@@ -206,26 +245,78 @@ def standard_tests():
     assert_equal(sixteen_tetrated_zero.compare(one), "equal")
 
     # timing test for fun
-    results = {}
-    count = 0
-    height = number.create_zero()
-    while True:
-        start = time.time_ns()
-        result = two.tetr(height)
-        duration = time.time_ns() - start
-        results[count] = (duration, len(result.state))
-        if count > 4:
-            # Stop at 64K.  64K outside of debug mode is ~12s on my laptop.
-            # Next would be 4GB.  Assuming runtime is linear vs size as this is just
-            # adding more unary digits, that is ~5K un-digits/s.  4GB is ~850K seconds/
-            # ~14K minutes/~238 hours/~4 days.  Small differences in implementations can push
-            # this time down to barely measurable or unreasonably long for a unit test.
-            break
-        count += 1
-        height = height.inc()
+    if False:
+        results = {}
+        count = 0
+        height = number.create_zero()
+        while True:
+            start = time.time_ns()
+            result = two.tetr(height)
+            duration = time.time_ns() - start
+            results[count] = (duration, len(result.state))
+            if count > 4:
+                # Stop at 64K.  64K outside of debug mode is ~12s on my laptop.
+                # Next would be 4GB.  Assuming runtime is linear vs size as this is just
+                # adding more unary digits, that is ~5K un-digits/s.  4GB is ~850K seconds/
+                # ~14K minutes/~238 hours/~4 days.  Small differences in implementations can push
+                # this time down to barely measurable or unreasonably long for a unit test.
+                break
+            count += 1
+            height = height.inc()
+        print(f"Tetration stats:")
+        pprint.pprint(results)
 
-    print(f"Tetration stats:")
-    pprint.pprint(results)
+# decrement
+
+    assert_equal(one.dec().compare(zero), "equal")
+    assert_equal(three.dec().compare(two), "equal")
+    assert_equal(four.dec().compare(two), "greater")
+
+    no_except = False
+    try:
+        zero.dec()
+        no_except = True
+    except UnderflowError:
+        pass
+    if no_except:
+        raise Exception("Did get an UnderflowError when trying to decrement zero")
+
+# division
+    # 0/1 = 0,0
+    assert_equal(zero.div(one)[0].compare(zero), "equal")
+    assert_equal(zero.div(one)[1].compare(zero), "equal")
+    # 1/1 = 1,0
+    assert_equal(one.div(one)[0].compare(one), "equal")
+    assert_equal(one.div(one)[1].compare(zero), "equal")
+    # 2/2 = 1,0
+    assert_equal(two.div(two)[0].compare(one), "equal")
+    assert_equal(two.div(two)[1].compare(zero), "equal")
+    # 4/2 = 2,0
+    assert_equal(four.div(two)[0].compare(two), "equal")
+    assert_equal(four.div(two)[1].compare(zero), "equal")
+
+    # 4/3 = 1,1
+    assert_equal(four.div(three)[0].compare(one), "equal")
+    assert_equal(four.div(three)[1].compare(one), "equal")
+
+    # 8/3 = 2,2
+    assert_equal(eight.div(three)[0].compare(two), "equal")
+    assert_equal(eight.div(three)[1].compare(two), "equal")
+
+
+    # 4/5 = 0,4
+    five: Final = two.add(two).inc()
+    assert_equal(four.div(five)[0].compare(zero), "equal")
+    assert_equal(four.div(five)[1].compare(four), "equal")
+
+    # 1/0 = by definition, returns DivideByZeroError
+    no_except = True
+    try:
+        one.div(zero)
+    except DivideByZeroError:
+        no_except = False
+    assert(not no_except)
+
 
 
 if __name__ == '__main__':
