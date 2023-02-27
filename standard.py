@@ -1,6 +1,7 @@
 import pprint
 import time
 from typing import Final
+from types import SimpleNamespace
 
 """
 The following is a class and set of unit tests related to Hyperoperation.
@@ -17,16 +18,17 @@ https://en.wikipedia.org/wiki/Hyperoperation
 """
 
 
+def assert_val_equal(a):
+    if a != "equal":
+        raise AssertionError(f"{a} is not \"equal\"")
+
+
 def assert_equal(a, b):
     if a != b:
         raise AssertionError(f"{a} is not {b}")
 
 
 class UnderflowError(ArithmeticError):
-    pass
-
-
-class DivideByZeroError(ArithmeticError):
     pass
 
 
@@ -50,12 +52,6 @@ class number:
         else:
             self._state = copy_state.copy()
 
-    @staticmethod
-    def create_zero():
-        #  I kind of hate to add this, but it might make creating a 0
-        #  clearer for new readers
-        return number()
-
     def inc(self):
         # Make a new number that is the previous list + a new element
         # (conscious effort to not use the + operator here even if it
@@ -71,25 +67,23 @@ class number:
 
     def mul(self, b):
         # 0th iteration is 0
-        result = number.create_zero()
+        result = n_.zero
         for _ in b.state:
             result = result.add(self)
         return result
 
     def pow(self, b):
         # 0th iteration is 1
-        result = number.create_zero().inc()
+        result = n_.one
         for _ in b.state:
             result = result.mul(self)
         return result
 
     def tetr(self, b):
         # Stupid piecewise definition
-        try:
-            b.state[0]
-        except:
+        if b.compare(n_.zero) == "equal":
             # 0th iteration is 1
-            return number.create_zero().inc()
+            return n_.one
         result = number(self.state)
         once = True
         # For the non-zero tetration case, you loop b - 1 times.
@@ -101,42 +95,50 @@ class number:
         return result
 
     def dec(self):
-        try:
-            self.state[0]
-            return number(self.state[1:])
-        except:
+        if self.compare(n_.zero) == "equal":
             raise UnderflowError("Oops.  You tried to decrement a zero.  Just natural numbers for now.")
-
+        return number(self.state[1:])
 
     def sub(self, s):
-        result = number(self.state)
-        try:
-            for _ in s.state:
-                result = result.dec()
-        except:
-            raise UnderflowError("Oops.  You tried to subtract a larger number from a smaller one.  Just natural numbers for now.")
-
+        result = self
+        for _ in s.state:
+            if result.compare(n_.zero) == "equal":
+                raise UnderflowError(
+                    "Oops.  You tried to subtract a larger number from a smaller one.  Just natural numbers for now.")
+            result = result.dec()
         return result
-
 
     def div(self, denominator):
         numerator = number(self.state)
-        divisions = number.create_zero()
-        if denominator.compare(number.create_zero()) == "equal":
-            raise DivideByZeroError()
-        try:
-            while True:
-                progress = number.create_zero()
-                for _ in denominator.state:
-                    numerator = numerator.dec()
-                    progress = progress.inc()
-                divisions = divisions.inc()
-        except UnderflowError:
-            return divisions, progress
+        divisions = n_.zero
+        if denominator.compare(n_.zero) == "equal":
+            raise ZeroDivisionError()
+        while True:
+            progress = n_.zero
+            for _ in denominator.state:
+                if numerator.compare(n_.zero) == "equal":
+                    return divisions, progress
+                numerator = numerator.dec()
+                progress = progress.inc()
+            divisions = divisions.inc()
 
-
-
-
+    #  This returns (magnitude, mantissa)
+    #  But the currently returned mantissa may not be the best representation.
+    #  It is the integer remainder of the next higher magnitude.
+    #  As this is a closed form solution, it seems complete enough.
+    def log(self, base):
+        numerator = number(self.state)
+        if base.compare(n_.zero) == "equal":
+            raise ZeroDivisionError()
+        if base.compare(n_.one) == "equal":
+            return n_.zero, n_.zero, n_.zero
+        magnitude = n_.zero
+        while True:
+            numerator, rem = numerator.div(base)
+            if numerator.compare(n_.zero) == "equal":
+                remainder = self.sub(base.pow(magnitude))
+                return magnitude, remainder
+            magnitude = magnitude.inc()
 
     def compare(self, b):
         for _ in self.state:
@@ -153,102 +155,91 @@ class number:
 
 
 def standard_tests():
-
-# Base representation
+    # Base representation
     # Test equality of zeros
-    a = number.create_zero()
-    b = number.create_zero()
-    assert_equal(a.compare(b), "equal")
+    a = n_.zero
+    b = n_.zero
+    assert_val_equal(a.compare(b))
 
     # We can't test inequality until we can make a different number!
 
-# Base operation, increment
-
-    zero: Final = number.create_zero()
+    # Base operation, increment
 
     # Verify 0 incremented is 1 > 0
-    one: Final = number.create_zero().inc()
-    assert_equal(one.compare(zero), "greater")
+    assert_equal(n_.one.compare(n_.zero), "greater")
 
-    assert_equal(zero.compare(one), "less")
+    assert_equal(n_.zero.compare(n_.one), "less")
 
-
-
-# Addition
+    # Addition
 
     # Basic... 1 + 2 = 3
-    two: Final = zero.inc().inc()
-    three: Final = one.add(two)
-    assert_equal(three.compare(zero.inc().inc().inc()), "equal")
+    one: Final = number().inc()
+    two: Final = number().inc().inc()
+    three: Final = number().inc().inc().inc()
+    assert_val_equal(three.compare(one.add(two)))
 
     # identity is 0
-    one_b = one.add(number.create_zero())
-    assert_equal(one_b.compare(one), "equal")
+    one_b = one.add(number())
+    assert_val_equal(one_b.compare(one))
 
     # Commutivity... 1 + 2 = 2 + 1
     three_fwd = one.add(two)
     three_rev = two.add(one)
-    assert_equal(three_fwd.compare(three_rev), "equal")
+    assert_val_equal(three_fwd.compare(three_rev))
 
     # Associativity... (1 + 2) + 3 = 1 + (2 + 3)
     six = one.add(two).add(three)
     six_b = one.add(two.add(three))
-    assert_equal(six.compare(six_b), "equal")
+    assert_val_equal(six.compare(six_b))
 
-
-
-# Multiplication
+    # Multiplication
 
     # Verify multiplication... 2 * 3 = 6
-    six = two.mul(three)
-    assert_equal(six.compare(three.add(three)), "equal")
+    assert_val_equal(n_.six.compare(n_.three.add(n_.three)))
 
     # Multiplication by Zero... 2 * 0 = 0
-    two_times_zero: Final = two.mul(number.create_zero())
-    assert_equal(two_times_zero.compare(zero), "equal")
+    two_times_zero: Final = n_.two.mul(n_.zero)
+    assert_val_equal(two_times_zero.compare(n_.zero))
 
     # identity... 2 * 1 = 2
-    two_times_one = two.mul(zero.inc())
-    assert_equal(two_times_one.compare(two), "equal")
+    two_times_one = two.mul(n_.one)
+    assert_val_equal(two_times_one.compare(two))
 
     # Commutivity... 2 * 6 = 6 * 1
-    twelve: Final = two.mul(six)
-    twelve_b = six.mul(two)
-    assert_equal(twelve.compare(twelve_b), "equal")
+    twelve: Final = n_.two.mul(n_.six)
+    twelve_b = n_.six.mul(n_.two)
+    assert_val_equal(twelve.compare(twelve_b))
 
     # Associativity
-    thirtysix: Final = two.mul(three).mul(six)
-    thirtysix_b = two.mul(three.mul(six))
-    assert_equal(thirtysix.compare(thirtysix_b), "equal")
+    thirtysix: Final = n_.two.mul(n_.three).mul(n_.six)
+    thirtysix_b = n_.two.mul(n_.three.mul(n_.six))
+    assert_val_equal(thirtysix.compare(thirtysix_b))
 
-
-# Power
+    # Power
 
     # Basic... 2 ^ 3 = 8
-    eight: Final = two.pow(three)
-    four: Final = two.add(two)
-    assert_equal(eight.compare(four.add(four)), "equal")
+    assert_val_equal(n_.eight.compare(n_.four.add(n_.four)))
 
     # Zer power... 2 ^ 0 = 1
-    two_to_zero = two.pow(zero)
-    assert_equal(two_to_zero.compare(one), "equal")
+    two_to_zero = n_.two.pow(n_.zero)
+    assert_val_equal(two_to_zero.compare(n_.one))
 
-# Tetration
+    # Tetration
 
     # 2 ^^ 3 = 16
-    sixteen: Final = two.pow(two).pow(two)
-    two_tetra_three = two.tetr(three)
-    assert_equal(sixteen.compare(two_tetra_three), "equal")
+    sixteen: Final = n_.two.pow(n_.two).pow(n_.two)
+    two_tetra_three = n_.two.tetr(n_.three)
+    assert_val_equal(sixteen.compare(two_tetra_three))
 
     # X ^^ 0 = 1, so we'll just use sixteen, 0 = 1
-    sixteen_tetrated_zero = sixteen.tetr(zero)
-    assert_equal(sixteen_tetrated_zero.compare(one), "equal")
+    sixteen_tetrated_zero = sixteen.tetr(n_.zero)
+    assert_val_equal(sixteen_tetrated_zero.compare(n_.one))
 
     # timing test for fun
     if False:
         results = {}
         count = 0
-        height = number.create_zero()
+        height = n_.zero
         while True:
             start = time.time_ns()
             result = two.tetr(height)
@@ -266,78 +257,141 @@ def standard_tests():
         print(f"Tetration stats:")
         pprint.pprint(results)
 
-# decrement
+    # decrement
 
-    assert_equal(one.dec().compare(zero), "equal")
-    assert_equal(three.dec().compare(two), "equal")
-    assert_equal(four.dec().compare(two), "greater")
+    assert_val_equal(n_.one.dec().compare(n_.zero))
+    assert_val_equal(n_.three.dec().compare(n_.two))
+    assert_equal(n_.four.dec().compare(n_.two), "greater")
 
     no_except = False
     try:
-        zero.dec()
+        n_.zero.dec()
         no_except = True
     except UnderflowError:
         pass
     if no_except:
         raise Exception("Did get an UnderflowError when trying to decrement zero")
 
-# subtraction
+    # subtraction
     # 0-0=0
-    assert_equal(zero.sub(zero).compare(zero), "equal")
+    assert_val_equal(n_.zero.sub(n_.zero).compare(n_.zero))
     # 1-0=1
-    assert_equal(one.sub(zero).compare(one), "equal")
+    assert_val_equal(n_.one.sub(n_.zero).compare(n_.one))
     # 1-1=0
-    assert_equal(one.sub(one).compare(zero), "equal")
+    assert_val_equal(n_.one.sub(n_.one).compare(n_.zero))
     # 2-2=0
-    assert_equal(one.sub(one).compare(zero), "equal")
+    assert_val_equal(n_.one.sub(n_.one).compare(n_.zero))
     # 3-1=2
-    assert_equal(three.sub(one).compare(two), "equal")
+    assert_val_equal(n_.three.sub(n_.one).compare(n_.two))
     # 1-2=underflow
     threw_underflow = False
     try:
-        one.sub(two)
+        n_.one.sub(n_.two)
     except UnderflowError:
         threw_underflow = True
     assert threw_underflow
 
-
-
-# division
+    # division
     # 0/1 = 0,0
-    assert_equal(zero.div(one)[0].compare(zero), "equal")
-    assert_equal(zero.div(one)[1].compare(zero), "equal")
+    assert_val_equal(n_.zero.div(n_.one)[0].compare(n_.zero))
+    assert_val_equal(n_.zero.div(n_.one)[1].compare(n_.zero))
     # 1/1 = 1,0
-    assert_equal(one.div(one)[0].compare(one), "equal")
-    assert_equal(one.div(one)[1].compare(zero), "equal")
+    assert_val_equal(n_.one.div(n_.one)[0].compare(n_.one))
+    assert_val_equal(n_.one.div(n_.one)[1].compare(n_.zero))
     # 2/2 = 1,0
-    assert_equal(two.div(two)[0].compare(one), "equal")
-    assert_equal(two.div(two)[1].compare(zero), "equal")
+    assert_val_equal(n_.two.div(n_.two)[0].compare(n_.one))
+    assert_val_equal(n_.two.div(n_.two)[1].compare(n_.zero))
     # 4/2 = 2,0
-    assert_equal(four.div(two)[0].compare(two), "equal")
-    assert_equal(four.div(two)[1].compare(zero), "equal")
+    assert_val_equal(n_.four.div(n_.two)[0].compare(n_.two))
+    assert_val_equal(n_.four.div(n_.two)[1].compare(n_.zero))
 
     # 4/3 = 1,1
-    assert_equal(four.div(three)[0].compare(one), "equal")
-    assert_equal(four.div(three)[1].compare(one), "equal")
+    assert_val_equal(n_.four.div(n_.three)[0].compare(n_.one))
+    assert_val_equal(n_.four.div(n_.three)[1].compare(n_.one))
 
     # 8/3 = 2,2
-    assert_equal(eight.div(three)[0].compare(two), "equal")
-    assert_equal(eight.div(three)[1].compare(two), "equal")
-
+    assert_val_equal(n_.eight.div(n_.three)[0].compare(n_.two))
+    assert_val_equal(n_.eight.div(n_.three)[1].compare(n_.two))
 
     # 4/5 = 0,4
-    five: Final = two.add(two).inc()
-    assert_equal(four.div(five)[0].compare(zero), "equal")
-    assert_equal(four.div(five)[1].compare(four), "equal")
+    five: Final = n_.two.add(n_.two).inc()
+    assert_val_equal(n_.four.div(five)[0].compare(n_.zero))
+    assert_val_equal(n_.four.div(five)[1].compare(n_.four))
 
     # 1/0 = by definition, returns DivideByZeroError
     no_except = True
     try:
-        one.div(zero)
-    except DivideByZeroError:
+        n_.one.div(n_.zero)
+    except ZeroDivisionError:
         no_except = False
-    assert(not no_except)
+    assert (not no_except)
 
+    # log
+    # log base 0 is undefined
+    ok = False
+    try:
+        n_.zero.log(n_.zero)
+    except ZeroDivisionError:
+        ok = True
+    assert ok
+
+    # logˇ1(2) = 0, mant=0
+    assert_val_equal(n_.two.log(n_.one)[0].compare(n_.zero))
+    assert_val_equal(n_.two.log(n_.one)[1].compare(n_.zero))
+    assert_val_equal(n_.two.log(n_.one)[2].compare(n_.zero))
+
+    # logˇ2(2) = 1, mant=0
+    assert_val_equal(n_.two.log(n_.two)[0].compare(n_.one))
+    assert_val_equal(n_.two.log(n_.two)[1].compare(n_.zero))
+
+    # logˇ2(4) = 2, mant=0
+    assert_val_equal(n_.four.log(n_.two)[0].compare(n_.two))
+    assert_val_equal(n_.four.log(n_.two)[1].compare(n_.zero))
+
+    # logˇ2(8) = 3, mant=0
+    assert_val_equal(n_.eight.log(n_.two)[0].compare(n_.three))
+    assert_val_equal(n_.eight.log(n_.two)[1].compare(n_.zero))
+
+    # logˇ2(15) = 3, mant=7
+    fifteen: Final = n_.two.mul(n_.two).inc().mul(n_.three)
+    assert_val_equal(fifteen.log(n_.two)[0].compare(n_.three))
+    assert_val_equal(fifteen.log(n_.two)[1].compare(n_.seven))
+
+    # logˇ3(15) = 2, mant=6
+    assert_val_equal(fifteen.log(n_.three)[0].compare(n_.two))
+    assert_val_equal(fifteen.log(n_.three)[1].compare(n_.six))
+
+    # logˇ4(15) = 1, mant=11
+    assert_val_equal(fifteen.log(n_.four)[0].compare(n_.one))
+    assert_val_equal(fifteen.log(n_.four)[1].compare(n_.ten.inc()))
+
+
+class SetOnceNamespace(SimpleNamespace):
+    def __setattr__(self, key, value):
+        if hasattr(key, 'property'):
+            raise NotImplementedError(f"{key} can be set only once!  Existing value: {self.key}")
+        SimpleNamespace.__setattr__(self, key, value)
+
+
+# Helper with predefined numbers
+class PreDefs:
+    def __init__(self):
+        self.zero = number()
+        self.one = self.zero.inc()
+        self.two = self.one.inc()
+        self.three = self.one.add(self.two)
+        self.four = self.two.add(self.two)
+        self.five = self.two.add(self.three)
+        self.six = self.three.add(self.three)
+        self.six = self.three.add(self.three)
+        self.seven = self.three.add(self.four)
+        self.eight = self.four.add(self.four)
+        self.nine = self.five.add(self.four)
+        self.ten = self.five.add(self.five)
+
+
+# short name to reduce clutter
+n_ = PreDefs()
 
 
 if __name__ == '__main__':
