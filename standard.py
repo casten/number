@@ -134,11 +134,28 @@ class number:
             return n_.zero, n_.zero, n_.zero
         magnitude = n_.zero
         while True:
-            numerator, rem = numerator.div(base)
+            numerator, _ = numerator.div(base)
             if numerator.compare(n_.zero) == "equal":
                 remainder = self.sub(base.pow(magnitude))
                 return magnitude, remainder
             magnitude = magnitude.inc()
+
+    def superlog(self, base):
+        if base.compare(n_.zero) == "equal":
+            raise ZeroDivisionError()
+        if base.compare(n_.one) == "equal":
+            return 1
+        height = n_.one
+        log_progress = number(self.state)
+        curr_base = base
+        while True:
+            log_progress, _ = log_progress.log(curr_base)
+            if log_progress.compare(n_.zero) == "equal":
+                remainder = self.sub(base.tetr(height))
+                return height, remainder
+            height = height.inc()
+            curr_base = curr_base.mul(curr_base)
+
 
     def compare(self, b):
         for _ in self.state:
@@ -163,15 +180,13 @@ def standard_tests():
 
     # We can't test inequality until we can make a different number!
 
-    # Base operation, increment
-
+# Base operation, increment
     # Verify 0 incremented is 1 > 0
     assert_equal(n_.one.compare(n_.zero), "greater")
 
     assert_equal(n_.zero.compare(n_.one), "less")
 
-    # Addition
-
+# Addition
     # Basic... 1 + 2 = 3
     one: Final = number().inc()
     two: Final = number().inc().inc()
@@ -192,8 +207,7 @@ def standard_tests():
     six_b = one.add(two.add(three))
     assert_val_equal(six.compare(six_b))
 
-    # Multiplication
-
+# Multiplication
     # Verify multiplication... 2 * 3 = 6
     assert_val_equal(n_.six.compare(n_.three.add(n_.three)))
 
@@ -215,17 +229,15 @@ def standard_tests():
     thirtysix_b = n_.two.mul(n_.three.mul(n_.six))
     assert_val_equal(thirtysix.compare(thirtysix_b))
 
-    # Power
-
+# Power
     # Basic... 2 ^ 3 = 8
     assert_val_equal(n_.eight.compare(n_.four.add(n_.four)))
 
-    # Zer power... 2 ^ 0 = 1
+    # Zero power... 2 ^ 0 = 1
     two_to_zero = n_.two.pow(n_.zero)
     assert_val_equal(two_to_zero.compare(n_.one))
 
-    # Tetration
-
+# Tetration
     # 2 ^^ 3 = 16
     sixteen: Final = n_.two.pow(n_.two).pow(n_.two)
     two_tetra_three = n_.two.tetr(n_.three)
@@ -257,8 +269,7 @@ def standard_tests():
         print(f"Tetration stats:")
         pprint.pprint(results)
 
-    # decrement
-
+# decrement
     assert_val_equal(n_.one.dec().compare(n_.zero))
     assert_val_equal(n_.three.dec().compare(n_.two))
     assert_equal(n_.four.dec().compare(n_.two), "greater")
@@ -272,7 +283,7 @@ def standard_tests():
     if no_except:
         raise Exception("Did get an UnderflowError when trying to decrement zero")
 
-    # subtraction
+# subtraction
     # 0-0=0
     assert_val_equal(n_.zero.sub(n_.zero).compare(n_.zero))
     # 1-0=1
@@ -291,7 +302,15 @@ def standard_tests():
         threw_underflow = True
     assert threw_underflow
 
-    # division
+    # inverse operation tests
+    # (x + y) - y = x
+    # (5 + 3) - 3 = x
+    assert_val_equal(n_.five.add(n_.three).sub(n_.three).compare(n_.five))
+    # (x + y) - x = y
+    # (5 + 3) - 5 = 3
+    assert_val_equal(n_.five.add(n_.three).sub(n_.five).compare(n_.three))
+
+# division
     # 0/1 = 0,0
     assert_val_equal(n_.zero.div(n_.one)[0].compare(n_.zero))
     assert_val_equal(n_.zero.div(n_.one)[1].compare(n_.zero))
@@ -326,7 +345,18 @@ def standard_tests():
         no_except = False
     assert (not no_except)
 
-    # log
+    # inverse operation tests
+    # (x * y)/x = y rem 0
+    # (5 * 3)/5 = 3 rem 0
+    assert_val_equal(n_.five.mul(n_.three).div(n_.five)[0].compare(n_.three))
+    assert_val_equal(n_.five.mul(n_.three).div(n_.five)[1].compare(n_.zero))
+    # (x * y)/y = x rem 0
+    # (5 * 3)/3 = 5 rem 0
+    assert_val_equal(n_.five.mul(n_.three).div(n_.three)[0].compare(n_.five))
+    assert_val_equal(n_.five.mul(n_.three).div(n_.three)[1].compare(n_.zero))
+
+
+# log
     # log base 0 is undefined
     ok = False
     try:
@@ -364,6 +394,32 @@ def standard_tests():
     # logˇ4(15) = 1, mant=11
     assert_val_equal(fifteen.log(n_.four)[0].compare(n_.one))
     assert_val_equal(fifteen.log(n_.four)[1].compare(n_.ten.inc()))
+
+    # inverse operation test
+    # general - logˇX(pow(X,Y) = Y, mant=0
+    # logˇ5(pow(5,3) = 3, mant=0
+    assert_val_equal(n_.three.pow(n_.five).log(n_.three)[0].compare(n_.five))
+    assert_val_equal(n_.three.pow(n_.five).log(n_.three)[1].compare(n_.zero))
+
+# superlog
+    # superlogˇ2(16) = 3, 0 (2^2^2 = 2^4 = 16)
+    sixteen: Final = fifteen.inc()
+    assert_val_equal(sixteen.superlog(n_.two)[0].compare(n_.three))
+    assert_val_equal(sixteen.superlog(n_.two)[1].compare(n_.zero))
+
+    # superlogˇ2(255) = 3, 23  (2^2^2 = 2^4 = 16... 255-16 = 239
+    twofiftyfive: Final = sixteen.mul(sixteen).dec()
+    twothirtynine: Final = twofiftyfive.sub(sixteen)
+    assert_val_equal(twofiftyfive.superlog(n_.two)[0].compare(n_.three))
+    assert_val_equal(twofiftyfive.superlog(n_.two)[1].compare(twothirtynine))
+
+    # superlogˇ3(20000) = 3, 317  (3^3 = 27^3 = 19683)
+    twentythousand: Final = n_.ten.pow(n_.three).mul(n_.ten.mul(n_.two))
+    threeseventeen: Final = n_.ten.pow(n_.two).mul(n_.three).add(n_.ten).add(n_.seven)
+    assert_val_equal(twentythousand.superlog(n_.three)[0].compare(n_.three))
+    assert_val_equal(twentythousand.superlog(n_.three)[1].compare(threeseventeen))
+
+
 
 
 class SetOnceNamespace(SimpleNamespace):
