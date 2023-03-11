@@ -16,7 +16,7 @@ https://en.wikipedia.org/wiki/Hyperoperation
 # Helper with predefined numbers
 class PreDefs:
     def __init__(self):
-        self.zero = number()
+        self.zero = Number()
         self.one = self.zero.inc()
         self.two = self.one.inc()
         self.three = self.one.add(self.two)
@@ -35,7 +35,7 @@ class UnderflowError(ArithmeticError):
     pass
 
 
-class number:
+class Number:
     """
     A number class with unary internal representation that attempts to implement
     arithmatic operations with minimal external functions.
@@ -59,11 +59,11 @@ class number:
         # Make a new number that is the previous list + a new element
         # (conscious effort to not use the + operator here even if it
         #  is just a cosmetic distinction)
-        return number([*self.state, 'x'])
+        return Number([*self.state, 'x'])
 
     def add(self, b):
         # 0th iteration is identity
-        result = number(self.state)
+        result = Number(self.state)
         for _ in b.state:
             result = result.inc()
         return result
@@ -87,7 +87,7 @@ class number:
         if b.compare(n_.zero) == "equal":
             # 0th iteration is 1
             return n_.one
-        result = number(self.state)
+        result = Number(self.state)
         once = True
         # For the non-zero tetration case, you loop b - 1 times.
         for _ in b.state:
@@ -100,7 +100,7 @@ class number:
     def dec(self):
         if self.compare(n_.zero) == "equal":
             raise UnderflowError("Oops.  You tried to decrement a zero.  Just natural numbers for now.")
-        return number(self.state[1:])
+        return Number(self.state[1:])
 
     def sub(self, s):
         result = self
@@ -112,7 +112,7 @@ class number:
         return result
 
     def div(self, denominator):
-        numerator = number(self.state)
+        numerator = Number(self.state)
         divisions = n_.zero
         if denominator.compare(n_.zero) == "equal":
             raise ZeroDivisionError()
@@ -130,7 +130,7 @@ class number:
     #  It is the integer remainder of the next higher magnitude.
     #  As this is a closed form solution, it seems complete enough.
     def log(self, base):
-        numerator = number(self.state)
+        numerator = Number(self.state)
         if base.compare(n_.zero) == "equal":
             raise ZeroDivisionError()
         if base.compare(n_.one) == "equal":
@@ -149,7 +149,7 @@ class number:
         if base.compare(n_.one) == "equal":
             return 1
         height = n_.one
-        log_progress = number(self.state)
+        log_progress = Number(self.state)
         curr_base = base
         while True:
             log_progress, _ = log_progress.log(curr_base)

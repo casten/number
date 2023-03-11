@@ -1,9 +1,9 @@
 from typing import Final
-from standard import number
+from Number import Number
 
 
 
-class alt_num(number):
+class alt_num(Number):
 
     @property
     def fx_tab(self):
@@ -16,7 +16,7 @@ class alt_num(number):
         }
 
     def apply(self, b, i):
-        result = number(self.state)
+        result = Number(self.state)
         for _ in range(b.val() - 1):
             result = result.fx_tab()[i](result)
         return result

@@ -1,5 +1,5 @@
-from standard import number, UnderflowError
-from standard import PreDefs
+from Number import Number, UnderflowError
+from Number import PreDefs
 from typing import Final
 import time
 from pprint import pprint
@@ -37,13 +37,13 @@ def standard_tests():
 # Addition
     print("Running Addition Tests")
     # Basic... 1 + 2 = 3
-    one: Final = number().inc()
-    two: Final = number().inc().inc()
-    three: Final = number().inc().inc().inc()
+    one: Final = Number().inc()
+    two: Final = Number().inc().inc()
+    three: Final = Number().inc().inc().inc()
     assert_val_equal(three.compare(one.add(two)))
 
     # identity is 0
-    one_b = one.add(number())
+    one_b = one.add(Number())
     assert_val_equal(one_b.compare(one))
 
     # Commutivity... 1 + 2 = 2 + 1
@@ -277,6 +277,71 @@ def time_tetration():
     pprint.pprint(results)
 
 
+def algebraic_rules():
+    X = n_.one
+    Y = n_.two
+    Z = n_.three
+
+# Commutivity
+    if True:
+    # Commutivity over addition
+        # X.add(Y) = Y.add(X)
+        assert_val_equal(X.add(Y).compare(Y.add(X)))
+    # Commutvity over multiplication
+        # X.mul(Y) = Y.mul(X)
+        assert_val_equal(X.mul(Y).compare(Y.mul(X)))
+
+# Associativity
+    if True:
+    # Associativity over addition
+        # X+Y+Z = X+Z+Y
+        # X.add(Y).add(Z) =  X.add(Z).add(Y)
+        assert_val_equal(X.add(Y).add(Z).compare(X.add(Z).add(Y)))
+    # Associativity over multiplication
+        # X*Y*Z = X*Z*Y
+        # X.mul(Y).mul(Z) =  X.mul(Z).mul(Y)
+        assert_val_equal(X.mul(Y).mul(Z).compare(X.mul(Z).mul(Y)))
+    # Associativity over pow (conversion from chain application to inner application)
+        # (X^Y)^Z = X^(Y*Z)
+        # X.pow(Y).pow(Z) =  X.pow(Y.mul(Z))
+        assert_val_equal(X.pow(Y).pow(Z).compare(X.pow(Z.mul(Y))))
+
+
+# Distributivity
+    if True:
+    # Distributivity of addition and multiplication
+        # (X+Y)Z = X*Z + Y*Z
+        # X.add(Y).mul(Z) = X.mul(Z).add(Y.mul(Z))
+        assert_val_equal(X.add(Y).mul(Z).compare(X.mul(Z).add(Y.mul(Z))))
+    # Distributivity of addition and multiplication
+        # (X*Y)^Z = X^Z * Y^Z
+        # X.mul(Y).pow(Z) = X.pow(Z).mul(Y.pow(Z))
+        assert_val_equal(X.mul(Y).pow(Z).compare(X.pow(Z).mul(Y.pow(Z))))
+
+# Identities
+    if True:
+    # addition identity
+        # X+0 = X
+        # X.add(n_.zero) = X
+        assert_val_equal(X.add(n_.zero).compare(X))
+    # multiplication identity
+        # X*1 = X
+        # X.mul(n_.one) = X
+        assert_val_equal(X.mul(n_.one).compare(X))
+    # power identity
+        # X^1 = X
+        # X.pow(n_.one) = X
+        assert_val_equal(X.pow(n_.one).compare(X))
+
+
+def solver():
+    # Y = X
+    # X = 1
+    # Y = 1
+    pass
+
+
 if __name__ == '__main__':
     standard_tests()
+    algebraic_rules()
     # time_tetration()
