@@ -1,4 +1,4 @@
-from Number import Number, UnderflowError
+from Number import Number, UnderflowError, UndefinedError
 from Number import PreDefs
 from typing import Final
 import time
@@ -81,10 +81,26 @@ def standard_tests():
 
 # Power
     print("Running Power Tests")
-    # Basic... 2 ^ 3 = 8
-    assert_val_equal(n_.eight.compare(n_.four.add(n_.four)))
 
-    # Zero power... 2 ^ 0 = 1
+    # 0^0 = 1
+    # In other definitions of power, 0^N is always zero.
+    # However, we have defined power to have the value before any iteration be 1.
+    # this results in 0^0 = 1.
+    assert_val_equal(n_.one.compare(n_.zero.pow(n_.zero)))
+
+    # 0^1 = 0
+    assert_val_equal(n_.zero.compare(n_.zero.pow(n_.one)))
+
+    # 1^0 = 1
+    assert_val_equal(n_.one.compare(n_.one.pow(n_.zero)))
+
+    # 1^1 = 1
+    assert_val_equal(n_.one.compare(n_.one.pow(n_.one)))
+
+    # Basic... 2^3 = 8
+    assert_val_equal(n_.eight.compare(n_.two.pow(n_.three)))
+
+    # Zero power... 2^0 = 1
     two_to_zero = n_.two.pow(n_.zero)
     assert_val_equal(two_to_zero.compare(n_.one))
 
@@ -192,17 +208,36 @@ def standard_tests():
 # log
     print("Running Log Tests")
     # log base 0 is undefined
-    ok = False
-    try:
-        n_.zero.log(n_.zero)
-    except ZeroDivisionError:
-        ok = True
-    assert ok
 
-    # logˇ1(2) = 0, mant=0
-    assert_val_equal(n_.two.log(n_.one)[0].compare(n_.zero))
-    assert_val_equal(n_.two.log(n_.one)[1].compare(n_.zero))
-    assert_val_equal(n_.two.log(n_.one)[2].compare(n_.zero))
+    # logˇ0(0) = 1, mant=0
+    # This disagrees with many definitions of log, but based on our
+    # definitions, 0^0 = 1, so log base zero of zero is one (, mant=0)
+    assert_val_equal(n_.zero.log(n_.zero)[0].compare(n_.one))
+    assert_val_equal(n_.zero.log(n_.zero)[1].compare(n_.zero))
+
+    # logˇ0(1) = any_value!, mant=0
+    assert_val_equal(n_.one.log(n_.zero)[0].compare(n_.any))
+    assert_val_equal(n_.one.log(n_.zero)[1].compare(n_.zero))
+
+    # logˇ2(0) = undefined
+    saw_exception = False
+    try:
+        n_.two.log(n_.zero)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
+
+    # logˇ1(1) = any_value!, mant=0
+    assert_val_equal(n_.one.log(n_.one)[0].compare(n_.any))
+    assert_val_equal(n_.one.log(n_.one)[1].compare(n_.zero))
+
+    # logˇ1(2) = undefined
+    saw_exception = False
+    try:
+        n_.two.log(n_.one)[0].compare(n_.one)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
 
     # logˇ2(2) = 1, mant=0
     assert_val_equal(n_.two.log(n_.two)[0].compare(n_.one))
@@ -237,6 +272,32 @@ def standard_tests():
 
 # superlog
     print("Running Superlog Tests")
+
+    # superlogˇ0(0) = any, 0
+    assert_val_equal(n_.zero.superlog(n_.zero)[0].compare(n_.any))
+    assert_val_equal(n_.zero.superlog(n_.zero)[1].compare(n_.zero))
+
+    # superlogˇ0(1) = UndefinedError
+    saw_exception = False
+    try:
+        n_.one.superlog(n_.zero)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
+
+    # superlogˇ1(1) = any, 0
+    assert_val_equal(n_.one.superlog(n_.one)[0].compare(n_.any))
+    assert_val_equal(n_.one.superlog(n_.one)[1].compare(n_.zero))
+
+    # superlogˇ1(3) = Undefined Error
+    saw_exception = False
+    try:
+        n_.three.superlog(n_.one)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
+
+
     # superlogˇ2(16) = 3, 0 (2^2^2 = 2^4 = 16)
     sixteen: Final = fifteen.inc()
     assert_val_equal(sixteen.superlog(n_.two)[0].compare(n_.three))

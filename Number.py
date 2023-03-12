@@ -11,6 +11,38 @@ Notes about implementation:
 References:
 https://en.wikipedia.org/wiki/Hyperoperation
 """
+from enum import Enum
+from enum import auto
+
+
+
+class UnderflowError(ArithmeticError):
+    pass
+
+
+class UndefinedError(ArithmeticError):
+    pass
+
+
+class Value:
+    pass
+
+
+class Special(Value):
+    class special_types(Enum):
+        any = auto()
+
+    def __init__(self, stype):
+        if not isinstance(stype, self.special_types):
+            raise Exception("To make a special, you must say the type, e.g. Special.types.any")
+        self.stype = stype
+
+    def compare(self, value):
+        if not isinstance(value, Special):
+            return "not equal"
+        if value.stype == self.stype:
+            return "equal"
+        return "not equal"
 
 
 # Helper with predefined numbers
@@ -29,13 +61,10 @@ class PreDefs:
         self.nine = self.five.add(self.four)
         self.ten = self.five.add(self.five)
 
+        self.any = Special(Special.special_types.any)
 
 
-class UnderflowError(ArithmeticError):
-    pass
-
-
-class Number:
+class Number(Value):
     """
     A number class with unary internal representation that attempts to implement
     arithmatic operations with minimal external functions.
@@ -132,9 +161,15 @@ class Number:
     def log(self, base):
         numerator = Number(self.state)
         if base.compare(n_.zero) == "equal":
-            raise ZeroDivisionError()
+            if self.compare(n_.zero) == "equal":
+                return n_.one, n_.zero
+            if self.compare(n_.one) == "equal":
+                return n_.any, n_.zero
+            raise UndefinedError("0^N where N!=[0,1] is always zero, so log base N cannot be calculated.")
         if base.compare(n_.one) == "equal":
-            return n_.zero, n_.zero, n_.zero
+            if self.compare(n_.one) == "equal":
+                return n_.any, n_.zero
+            raise UndefinedError()
         magnitude = n_.zero
         while True:
             numerator, _ = numerator.div(base)
@@ -145,9 +180,13 @@ class Number:
 
     def superlog(self, base):
         if base.compare(n_.zero) == "equal":
-            raise ZeroDivisionError()
+            if self.compare(n_.zero) == "equal":
+                return n_.any, n_.zero
+            raise UndefinedError()
         if base.compare(n_.one) == "equal":
-            return 1
+            if self.compare(n_.one) == "equal":
+                return n_.any, n_.zero
+            raise UndefinedError()
         height = n_.one
         log_progress = Number(self.state)
         curr_base = base
@@ -161,6 +200,8 @@ class Number:
 
 
     def compare(self, b):
+        if isinstance(b,Special):
+            return "not equal"
         for _ in self.state:
             try:
                 b.state[0]
