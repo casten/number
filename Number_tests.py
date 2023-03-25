@@ -59,7 +59,7 @@ def standard_tests():
 # Multiplication
     print("Running Multiplication Tests")
     # Verify multiplication... 2 * 3 = 6
-    assert_val_equal(n_.six.compare(n_.three.add(n_.three)))
+    assert_val_equal(n_.two.mul(n_.three).compare(n_.six))
 
     # Multiplication by Zero... 2 * 0 = 0
     two_times_zero: Final = n_.two.mul(n_.zero)

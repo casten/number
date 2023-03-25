@@ -1,9 +1,10 @@
 from Number import Number
 from Number import PreDefs
 from Number_tests import assert_val_equal
+import copy
+
 
 n_ = PreDefs()
-
 
 """
 Expression = Value, (None | Operation)
@@ -12,18 +13,65 @@ Operation = (Operator, Expression)
 """
 
 
+
+class Operator:
+    operators = {
+        "inc": Number.inc,
+        "add": Number.add,
+        "mul": Number.mul,
+        "pow": Number.pow,
+        "tetr": Number.tetr,
+        "dec": Number.dec,
+        "sub": Number.sub,
+        "div": Number.div,
+        "log": Number.log,
+        "superlog": Number.superlog
+    }
+    standard_map = {
+        "add": "+",
+        "mul": "*",
+        "pow": "^",
+        "tetr": "^^",
+        "sub": "-",
+        "div": "/",
+        "log": "log",
+        "superlog": "slog"
+    }
+
+    def apply(self, number, expression):
+        return self.operators[self.name](number, expression)
+
+    def __init__(self, operator):
+        self.name = operator
+
+    def compare(self, operator):
+        return "equal" if self.name == operator.name else "not equal"
+
+    def repr_standard(self):
+        return self.standard_map[self.name]
+
+
 class Operation:
     def __init__(self, operator, expression):
+        if not isinstance(operator, Operator):
+            raise Exception("The first param of Operation must be an Operator")
+        if not isinstance(expression, Expression):
+            raise Exception("The second param of Operation must be an Expression")
         self.operator = operator
         self.expression = expression
 
     def compare(self, operation2):
-        if self.operator != operation2.operator:
+        if self.operator.name != operation2.operator.name:
             return "not equal"
         if self.expression.compare(operation2.expression) == "not equal":
             return "not equal"
         return "equal"
 
+    def repr_standard(self):
+        if isinstance(self.expression, Expression) and self.expression.operation is not None:
+            if self.expression.operation.expression is not None:
+                return f" {self.operator.repr_standard()} ({self.expression.repr_standard()})"
+        return f" {self.operator.repr_standard()} {self.expression.repr_standard()}"
 
 
 class Variable:
@@ -34,6 +82,9 @@ class Variable:
         if self._symbol == var2._symbol:
             return "equal"
         return "not equal"
+
+    def repr_standard(self):
+        return self._symbol
 
 
 
@@ -54,9 +105,12 @@ class Expression:
                     (Variable, Operation=(mul, (Number, (add, Variable)))))
                     ('X', Operation=(mul, (three, (add, 'X')))))
     """
-    def __init__(self, value, operation):
+    def __init__(self, value, operation=None):
         self.value = value
         self.operation = operation
+
+    def copy(self):
+        return copy.deepcopy(self)
 
     def tail(self):
         curr_expr = self
@@ -70,11 +124,13 @@ class Expression:
 
     def chain(self, operation):
         self.tail().operation = operation
-        return self
+        new_exp = Expression(self.value, None)
+        new_exp.tail().operation = operation
+        return new_exp
 
     def subst(self, var, replacement):
         #  Allows for substitution of a variable with another variable or number
-        curr_term = self
+        curr_term = self_copy = self.copy()
         # Go through operation chain and replace matching vars
         while True:
             if isinstance(curr_term.value, Variable):
@@ -86,67 +142,45 @@ class Expression:
                 break
             if isinstance(curr_term.operation.expression, Expression):
                 curr_term = curr_term.operation.expression
+        return self_copy
 
     @staticmethod
     def can_collapse(value1, operator, value2):
         if isinstance(value1, Number):
             if isinstance(value2, Number):
-                if operator in ["add", "mul", "pow", "tetr", "sub"]:
+                if operator.name in ["add", "mul", "pow", "tetr", "sub"]:
                     return True
         if isinstance(value1, Variable):
             if isinstance(value2, Variable):
                 if value1.compare(value2):
-                    match operator:
-                        case "add" | "mul" |"pow" | "sub" |"div" :
+                    match operator.name:
+                        case "add" | "mul" | "pow" | "sub" | "div" :
                             return True
                     return False
         return False
 
-    @staticmethod
-    def _apply(number, operator, expression):
-        if operator == "inc":
-            return number.inc()
-        if operator == "add":
-            return number.add(expression)
-        if operator == "mul":
-            return number.mul(expression)
-        if operator == "pow":
-            return number.pow(expression)
-        if operator == "tetr":
-            return number.tetr(expression)
-        if operator == "dec":
-            return number.dec()
-        if operator == "sub":
-            return number.sub(expression)
-        if operator == "div":
-            return number.div(expression)
-        if operator == "log":
-            return number.log(expression)
-        if operator == "superlog":
-            return number.superlog(expression)
-
-        raise Exception(f"Unknown operator: {operator}")
 
     @staticmethod
     def collapse(first_value, operator, next_value):
         # Apply operators to numbers that result in the same output size, e.g.
         #  add, mul, pow, tetr, sub
         if isinstance(first_value, Number):
-            if operator in ["add", "mul", "pow", "tetr", "sub"]:
-                return Expression._apply(first_value, operator, next_value)
+            if operator.name in ["add", "mul", "pow", "tetr", "sub"]:
+                return operator.apply(first_value, next_value)
         # Collapse variables
         if isinstance(first_value, Variable):
             promoters = {"add": "mul",
                          "mul": "pow",
                          "pow": "tetr"}
-            if operator in promoters:
-                return Expression(first_value, None).chain(Operation(promoters[operator], Expression(n_.two, None)))
+            if operator.name in promoters:
+                new_operator = Operator(promoters[operator.name])
+                return Expression(first_value, None).chain(Operation(new_operator, Expression(n_.two)))
             else:
                 # otherwise it is an identity
                 idents = {"sub": n_.zero,
                           "div": n_.one,
                           "log": n_.one}
-                return Expression(idents[operator])
+                return Expression(idents[operator.name])
         raise Exception("Collapse called on non-collapsable elements")
 
 
@@ -154,37 +188,45 @@ class Expression:
         # Evaluation simplifies chains of terms using algebraic rules.
         # First pass adds and multiplies all adjacent numbers.
         # We'll also count the number of variables in case there are none left.
-        curr_exp = self
-        next_oper = None
+
+        curr_exp = self_copy = self.copy()
+        next_operation = None
 
         while True:
-            # Collapse repeated numeric operations
-            if curr_exp.operation is not None:
-                if curr_exp.operation.expression is not None:
-                    next_exp = curr_exp.operation.expression
-                    next_oper = next_exp.operation
-                    if self.can_collapse(curr_exp.value, curr_exp.operation.operator, next_exp.value):
-                        result = self.collapse(curr_exp.value, curr_exp.operation.operator, next_exp.value)
-                        # We've got the replacement for the current node.
-                        # Now replace the parent operation to point to the new collpased expression
-                        if isinstance(result, Expression):
-                            # When an expression is returned, we'll have a new expression formed
-                            # in the chain to plug it in, e.g.
-                            # x.add(x).mul(3) will collapse to
-                            # x.mul(2).mul(3)
-                            curr_exp.operation = result.operation
-                            curr_exp.operation.expression.operation = next_oper
-                        else:
-                            curr_exp.operation = next_oper
-                            curr_exp.value = result
-                        curr_exp = self
-                        continue  # since we had a collapse, go through again to try another
-                if next_oper is None:
-                    break
-                curr_exp = next_oper.value
-            else:
+            # If no operation, we're done
+            if curr_exp.operation is None:
                 break
-        return self
+            # Look for and collapse adjacent numeric operations
+            if curr_exp.operation.expression is None:
+                raise Exception("Error! Operation has no expression.")
+            # Get the next expression to check for possible simplification
+            next_exp = curr_exp.operation.expression
+            next_operation = next_exp.operation
+            if self_copy.can_collapse(curr_exp.value, curr_exp.operation.operator, next_exp.value):
+                result = self_copy.collapse(curr_exp.value, curr_exp.operation.operator, next_exp.value)
+                # We've got the replacement for the current node.
+                # Now replace the parent operation to point to the new collpased expression
+                if isinstance(result, Expression):
+                    # When an expression is returned, we'll have a new expression formed
+                    # in the chain to plug it in, e.g.
+                    # x.add(x).mul(3) will collapse to
+                    # x.mul(2).mul(3)
+                    curr_exp.operation = result.operation
+                    curr_exp.operation.expression.operation = next_operation
+                else:
+                    curr_exp.operation = next_operation
+                    curr_exp.value = result
+                # since we had a collapse, reset to begin and try again
+                curr_exp = self_copy
+                continue
+            if next_operation is None:
+                break  # No more operations, so we've reached the end
+            # We weren't able to collapse the current and next values, so march onward!
+            if isinstance(next_operation.expression, Expression):
+                curr_exp = next_operation.expression
+            else:
+                curr_exp = next_operation.value
+        return self_copy
 
     def compare(self, expr2):
         if not isinstance(expr2, Expression):
@@ -218,41 +260,67 @@ class Expression:
         # Everything matches, so return True
         return "equal"
 
+    def repr_standard(self):
+        if self.operation is None:
+            return self.value.repr_standard()
+        else:
+            return self.value.repr_standard() + self.operation.repr_standard()
 
 
 def expression_unit_test():
+
     # Expression with one number, no operation
     # Subst should do nothing
     ex = Expression(n_.zero, None)
-    ex.subst(Variable("X"), n_.one)
+    ex = ex.subst(Variable("X"), n_.one)
+    print(ex.repr_standard())
     assert_val_equal(ex.value.compare(n_.zero))
 
     # Expression with one variable, no operation
     # Define a term with just X and replace X with 1.
     ex = Expression(Variable("X"), None)
-    ex.subst(Variable("X"), n_.one)
+    ex = ex.subst(Variable("X"), n_.one)
+    print(ex.repr_standard())
     assert_val_equal(ex.value.compare(n_.one))
 
     # Basic Eval test
     ex = Expression(Variable("X"), None)
-    ex.subst(Variable("X"), n_.one)
+    ex = ex.subst(Variable("X"), n_.one)
+    print(ex.repr_standard())
     assert_val_equal(ex.simplify().value.compare(n_.one))
 
     # X + 1, x=1
-    ex = Expression(Variable("X"), Operation("add", Expression(n_.one, None)))
-    ex.subst(Variable("X"), n_.one)
+    ex = Expression(Variable("X"), Operation(Operator("add"), Expression(n_.one)))
+    ex = ex.subst(Variable("X"), n_.one)
+    print(ex.repr_standard())
     assert_val_equal(ex.simplify().value.compare(n_.two))
 
     # Using chain syntax to attach separate expressions with an operation
     # X + X, x=1
-    ex = Expression(Variable("X"), None)
-    ex2 = Expression(Variable("X"), None)
-    oper_add_ex2 = Operation("add", ex2)
-    ex.chain(oper_add_ex2)
+    ex = Expression(Variable("X"))
+    ex2 = Expression(Variable("X"))
+    oper_add_ex2 = Operation(Operator("add"), ex2)
+    ex = ex.chain(oper_add_ex2)
+    print(ex.repr_standard())
     # This will simply the expression by merging the X+X to become a single X * 2
-    ex.simplify()
+    ex = ex.simplify()
     # Verify simplification
-    assert_val_equal(ex.compare(Expression(Variable("X"), Operation("mul", Expression(n_.two, None)))))
-    ex.subst(Variable("X"), n_.one)
-    ex.simplify()
+    ex2 = Expression(Variable("X"), Operation(Operator("mul"), Expression(n_.two)))
+    assert_val_equal(ex.compare(ex2))
+    ex = ex.subst(Variable("X"), n_.one)
+    ex = ex.simplify()
     assert_val_equal(ex.value.compare(n_.two))
+    print(ex.repr_standard())
+
+    # Using chain syntax to attach separate expressions with an operation
+    # X + 2 * (X+1)
+    ex_x = Expression(Variable("X"))
+    ex_xadd1 = Expression(Variable("X"), Operation(Operator("add"), Expression(n_.one)))
+    ex_2times_ex_xadd1 = Expression(n_.two, Operation(Operator("mul"), ex_xadd1))
+    ex_x = ex_x.chain(Operation(Operator("add"), ex_2times_ex_xadd1))
+    print(ex_x.repr_standard())
+
+
+if __name__ == "__main__":
+    expression_unit_test()
+

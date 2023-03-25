@@ -214,6 +214,8 @@ class Number(Value):
         except:
             return "equal"
 
+    def repr_standard(self):
+        return str(len(self._state))
 
 # short name to reduce clutter
 n_ = PreDefs()
