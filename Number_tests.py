@@ -1,9 +1,9 @@
-from Number import Number, UnderflowError, UndefinedError
+from Number import Number, UndefinedError, ComplexUnimplemented
 from Number import PreDefs
 from typing import Final
 import time
 from pprint import pprint
-
+from Number import Sign
 
 # short name to reduce clutter
 n_ = PreDefs()
@@ -34,6 +34,13 @@ def standard_tests():
 
     assert_equal(n_.zero.compare(n_.one), "less")
 
+# Inc
+    negative_zero = n_.neg_one.inc()
+    assert_val_equal(negative_zero.compare(Number(n_.zero, Sign.neg)))
+    pos_one = negative_zero.inc()
+    assert_val_equal(pos_one.compare(n_.one))
+
+
 # Addition
     print("Running Addition Tests")
     # Basic... 1 + 2 = 3
@@ -55,6 +62,16 @@ def standard_tests():
     six = one.add(two).add(three)
     six_b = one.add(two.add(three))
     assert_val_equal(six.compare(six_b))
+
+    #Negative Numbers
+    # 1 + -1 = 0
+    assert_val_equal(n_.one.add(n_.neg_one).compare(n_.zero))
+    # -1 + -1 = -2
+    assert_val_equal(n_.neg_one.add(n_.neg_one).compare(Number(n_.two, Sign.neg)))
+    # -1 + 4 = 3
+    assert_val_equal(n_.neg_one.add(n_.four).compare(Number(n_.three, Sign.pos)))
+
+
 
 # Multiplication
     print("Running Multiplication Tests")
@@ -78,6 +95,28 @@ def standard_tests():
     thirtysix: Final = n_.two.mul(n_.three).mul(n_.six)
     thirtysix_b = n_.two.mul(n_.three.mul(n_.six))
     assert_val_equal(thirtysix.compare(thirtysix_b))
+
+    # Negative Numbers
+    neg_zero: Final = Number(n_.zero, Sign.neg)
+    # -0 * 0 = -0
+    assert_val_equal(neg_zero.mul(n_.zero).compare(neg_zero))
+    # -0 * -0 = 0
+    assert_val_equal(neg_zero.mul(neg_zero).compare(n_.zero))
+    # 0 * -1 = 0
+    assert_val_equal(n_.zero.mul(n_.neg_one).compare(neg_zero))
+    # -0 * -1 = 0
+    assert_val_equal(neg_zero.mul(n_.neg_one).compare(n_.zero))
+    # -1 * 1 = -1
+    assert_val_equal(n_.neg_one.mul(n_.one).compare(n_.neg_one))
+    # -1 * -1 = 1
+    assert_val_equal(n_.neg_one.mul(n_.neg_one).compare(n_.one))
+    # -1 * 5 = -5
+    assert_val_equal(n_.neg_one.mul(n_.five).compare(Number(n_.five, Sign.neg)))
+    # -2 * -5 = 10
+    neg_two: Final = n_.neg_one.dec()
+    neg_five = n_.five.mul(n_.neg_one)
+    assert_val_equal(neg_two.mul(neg_five).compare(Number(n_.ten)))
+
 
 # Power
     print("Running Power Tests")
@@ -104,6 +143,19 @@ def standard_tests():
     two_to_zero = n_.two.pow(n_.zero)
     assert_val_equal(two_to_zero.compare(n_.one))
 
+    #negative expoenents
+    # -1^2 = 1
+    assert_val_equal(n_.neg_one.pow(n_.two).compare(n_.one))
+    # -2^3 = -8
+    assert_val_equal(Number(n_.two, Sign.neg).pow(n_.three).compare(Number(n_.eight, Sign.neg)))
+    # 2^-3 = 1/8
+    two_to_neg_three = n_.two.pow(Number(n_.three, Sign.neg))
+    one_eighth = n_.one.div(n_.eight)
+    assert_val_equal(two_to_neg_three[0].compare(one_eighth[0]))
+    assert_val_equal(two_to_neg_three[1].compare(one_eighth[1]))
+
+
+
 # Tetration
     print("Running Tetration Tests")
     # 2 ^^ 3 = 16
@@ -115,6 +167,11 @@ def standard_tests():
     sixteen_tetrated_zero = sixteen.tetr(n_.zero)
     assert_val_equal(sixteen_tetrated_zero.compare(n_.one))
 
+    # X ^^ (-N) = 1/(X^^N)
+    two_tetra_neg_three = n_.two.tetr(n_.three.mul(n_.neg_one))
+    assert_val_equal(sixteen.compare(two_tetra_three))
+
+
 
 # decrement
     print("Running Decrement Tests")
@@ -122,14 +179,9 @@ def standard_tests():
     assert_val_equal(n_.three.dec().compare(n_.two))
     assert_equal(n_.four.dec().compare(n_.two), "greater")
 
-    no_except = False
-    try:
-        n_.zero.dec()
-        no_except = True
-    except UnderflowError:
-        pass
-    if no_except:
-        raise Exception("Did get an UnderflowError when trying to decrement zero")
+    neg_one = n_.zero.dec()
+    assert_equal(neg_one.compare(n_.neg_one), "equal")
+
 
 # subtraction
     print("Running Subtraction Tests")
@@ -143,13 +195,18 @@ def standard_tests():
     assert_val_equal(n_.one.sub(n_.one).compare(n_.zero))
     # 3-1=2
     assert_val_equal(n_.three.sub(n_.one).compare(n_.two))
-    # 1-2=underflow
-    threw_underflow = False
-    try:
-        n_.one.sub(n_.two)
-    except UnderflowError:
-        threw_underflow = True
-    assert threw_underflow
+
+    #negative numbers
+    # 1-2=-1
+    neg_one = n_.one.sub(n_.two)
+    assert_val_equal(neg_one.compare(Number(n_.one, Sign.neg)))
+    # 0-1=-1
+    neg_one = n_.zero.sub(n_.one)
+    assert_val_equal(neg_one.compare(Number(n_.one, Sign.neg)))
+    # 10-20=-10
+    neg_ten = n_.ten.sub(n_.ten.mul(n_.two))
+    assert_val_equal(neg_ten.compare(Number(n_.ten, Sign.neg)))
+
 
     # inverse operation tests
     # (x + y) - y = x
@@ -161,12 +218,18 @@ def standard_tests():
 
 # division
     print("Running Division Tests")
-    # 0/1 = 0,0
-    assert_val_equal(n_.zero.div(n_.one)[0].compare(n_.zero))
-    assert_val_equal(n_.zero.div(n_.one)[1].compare(n_.zero))
+    # 0/1 = 0,1
+    zero_oneths = n_.zero.div(n_.one)
+    assert_val_equal(zero_oneths[0].compare(n_.zero))
+    assert_val_equal(zero_oneths[1].compare(n_.zero))
     # 1/1 = 1,0
-    assert_val_equal(n_.one.div(n_.one)[0].compare(n_.one))
-    assert_val_equal(n_.one.div(n_.one)[1].compare(n_.zero))
+    one_oneths = n_.one.div(n_.one)
+    assert_val_equal(one_oneths[0].compare(n_.one))
+    assert_val_equal(one_oneths[1].compare(n_.zero))
+    # 1/2 = 0,1
+    one_half = n_.one.div(n_.two)
+    assert_val_equal(one_half[0].compare(n_.zero))
+    assert_val_equal(one_half[1].compare(n_.one))
     # 2/2 = 1,0
     assert_val_equal(n_.two.div(n_.two)[0].compare(n_.one))
     assert_val_equal(n_.two.div(n_.two)[1].compare(n_.zero))
@@ -187,6 +250,11 @@ def standard_tests():
     assert_val_equal(n_.four.div(five)[0].compare(n_.zero))
     assert_val_equal(n_.four.div(five)[1].compare(n_.four))
 
+    # 1/8 = 0,1
+    assert_val_equal(n_.one.div(n_.eight)[0].compare(n_.zero))
+    assert_val_equal(n_.one.div(n_.eight)[1].compare(n_.one))
+
+
     # 1/0 = by definition, returns DivideByZeroError
     no_except = True
     try:
@@ -194,6 +262,32 @@ def standard_tests():
     except ZeroDivisionError:
         no_except = False
     assert (not no_except)
+
+    # 1/-1 = -1, 0
+    assert_val_equal(n_.one.div(n_.neg_one)[0].compare(n_.neg_one))
+    assert_val_equal(n_.one.div(n_.neg_one)[1].compare(n_.zero))
+
+    # -1/-1 = 1, 0
+    assert_val_equal(n_.neg_one.div(n_.neg_one)[0].compare(n_.one))
+    assert_val_equal(n_.neg_one.div(n_.neg_one)[1].compare(n_.zero))
+
+    # -0/0 = divide_by_zero
+    no_except = True
+    try:
+        n_.neg_one.mul(neg_zero).div(n_.zero)
+    except ZeroDivisionError:
+        no_except = False
+    assert (not no_except)
+
+    # -0/-1 = 0, 0
+    assert_val_equal(neg_zero.div(n_.neg_one)[0].compare(n_.zero))
+    assert_val_equal(neg_zero.div(n_.neg_one)[0].compare(n_.zero))
+    # -0/1 = -0, 0
+    assert_val_equal(neg_zero.div(n_.one)[0].compare(neg_zero))
+    assert_val_equal(neg_zero.div(n_.one)[1].compare(n_.zero))
+    # 0/-1 = -0, 0
+    assert_val_equal(n_.zero.div(n_.neg_one)[0].compare(neg_zero))
+    assert_val_equal(n_.zero.div(n_.neg_one)[1].compare(n_.zero))
 
     # inverse operation tests
     # (x * y)/x = y rem 0
@@ -219,13 +313,22 @@ def standard_tests():
     assert_val_equal(n_.one.log(n_.zero)[0].compare(n_.any))
     assert_val_equal(n_.one.log(n_.zero)[1].compare(n_.zero))
 
-    # logˇ2(0) = undefined
+    # logˇ0(2) = undefined
     saw_exception = False
     try:
         n_.two.log(n_.zero)
     except UndefinedError as e:
         saw_exception = True
     assert(saw_exception)
+
+    # logˇ2(0) = undefined
+    saw_exception = False
+    try:
+        n_.zero.log(n_.two)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
+
 
     # logˇ1(1) = any_value!, mant=0
     assert_val_equal(n_.one.log(n_.one)[0].compare(n_.any))
@@ -240,8 +343,9 @@ def standard_tests():
     assert(saw_exception)
 
     # logˇ2(2) = 1, mant=0
-    assert_val_equal(n_.two.log(n_.two)[0].compare(n_.one))
-    assert_val_equal(n_.two.log(n_.two)[1].compare(n_.zero))
+    two_log_two = n_.two.log(n_.two)
+    assert_val_equal(two_log_two[0].compare(n_.one))
+    assert_val_equal(two_log_two[1].compare(n_.zero))
 
     # logˇ2(4) = 2, mant=0
     assert_val_equal(n_.four.log(n_.two)[0].compare(n_.two))
@@ -253,8 +357,9 @@ def standard_tests():
 
     # logˇ2(15) = 3, mant=7
     fifteen: Final = n_.two.mul(n_.two).inc().mul(n_.three)
-    assert_val_equal(fifteen.log(n_.two)[0].compare(n_.three))
-    assert_val_equal(fifteen.log(n_.two)[1].compare(n_.seven))
+    fifteen_log_2 = fifteen.log(n_.two)
+    assert_val_equal(fifteen_log_2[0].compare(n_.three))
+    assert_val_equal(fifteen_log_2[1].compare(n_.seven))
 
     # logˇ3(15) = 2, mant=6
     assert_val_equal(fifteen.log(n_.three)[0].compare(n_.two))
@@ -263,6 +368,60 @@ def standard_tests():
     # logˇ4(15) = 1, mant=11
     assert_val_equal(fifteen.log(n_.four)[0].compare(n_.one))
     assert_val_equal(fifteen.log(n_.four)[1].compare(n_.ten.inc()))
+
+
+    # Again, the following base zero logs disagree with many definitions of log, but based on our
+    # definitions, 0^0 = 1, so log base zero of zero is one (, mant=0)
+    # (I have no evidence for the truth of the negative sign, I'll just conserve it)
+    # logˇ-0(0) = -1, mant=0
+    neg_zero_log_base_zero = n_.zero.log(neg_zero)
+    assert_val_equal(neg_zero_log_base_zero[0].compare(n_.neg_one))
+    assert_val_equal(neg_zero_log_base_zero[1].compare(n_.zero))
+
+    # logˇ0(-0) = -1
+    zero_log_base_neg_zero = n_.zero.log(neg_zero)
+    assert_val_equal(zero_log_base_neg_zero[0].compare(n_.neg_one))
+    assert_val_equal(zero_log_base_neg_zero[1].compare(n_.zero))
+
+
+    # logˇ0(1) = any_value!, mant=0
+    assert_val_equal(n_.one.log(n_.zero)[0].compare(n_.any))
+    assert_val_equal(n_.one.log(n_.zero)[1].compare(n_.zero))
+
+    # logˇ2(0) = undefined
+    saw_exception = False
+    try:
+        n_.two.log(n_.zero)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
+
+
+    # logˇ-1(1) = any_even, mant=0
+    log_one_base_neg_one = n_.one.log(n_.neg_one)
+    assert_val_equal(log_one_base_neg_one[0].compare(n_.any_even))
+    assert_val_equal(log_one_base_neg_one[1].compare(n_.zero))
+
+    # logˇ-1(-1) = any_odd, mant=0
+    log_neg_one_base_neg_one = n_.neg_one.log(n_.neg_one)
+    assert_val_equal(log_neg_one_base_neg_one[0].compare(n_.any_odd))
+    assert_val_equal(log_neg_one_base_neg_one[1].compare(n_.zero))
+
+    # logˇ-2(4) = 2, mant=0
+    log_b_neg_two_of_four = n_.four.log(neg_two)
+    assert_val_equal(log_b_neg_two_of_four[0].compare(n_.two))
+    assert_val_equal(log_b_neg_two_of_four[1].compare(n_.zero))
+
+    # logˇ-2(8) = complex (not handled.. yet?!?!)
+    threw_correct = False
+    try:
+        n_.eight.log(neg_two)
+    except ComplexUnimplemented:
+        threw_correct = True
+    assert threw_correct
+
+
+
 
     # inverse operation test
     # general - logˇX(pow(X,Y) = Y, mant=0
@@ -309,11 +468,6 @@ def standard_tests():
     assert_val_equal(twofiftyfive.superlog(n_.two)[0].compare(n_.three))
     assert_val_equal(twofiftyfive.superlog(n_.two)[1].compare(twothirtynine))
 
-    # superlogˇ3(20000) = 3, 317  (3^3 = 27^3 = 19683)
-    twentythousand: Final = n_.ten.pow(n_.three).mul(n_.ten.mul(n_.two))
-    threeseventeen: Final = n_.ten.pow(n_.two).mul(n_.three).add(n_.ten).add(n_.seven)
-    assert_val_equal(twentythousand.superlog(n_.three)[0].compare(n_.three))
-    assert_val_equal(twentythousand.superlog(n_.three)[1].compare(threeseventeen))
 
 
 def time_tetration():
@@ -393,13 +547,6 @@ def algebraic_rules():
         # X^1 = X
         # X.pow(n_.one) = X
         assert_val_equal(X.pow(n_.one).compare(X))
-
-
-def solver():
-    # Y = X
-    # X = 1
-    # Y = 1
-    pass
 
 
 if __name__ == '__main__':

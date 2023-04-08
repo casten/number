@@ -13,7 +13,7 @@ https://en.wikipedia.org/wiki/Hyperoperation
 """
 from enum import Enum
 from enum import auto
-
+import copy
 
 
 class UnderflowError(ArithmeticError):
@@ -24,6 +24,9 @@ class UndefinedError(ArithmeticError):
     pass
 
 
+class ComplexUnimplemented(ArithmeticError):
+    pass
+
 class Value:
     pass
 
@@ -31,6 +34,8 @@ class Value:
 class Special(Value):
     class special_types(Enum):
         any = auto()
+        any_even = auto()
+        any_odd = auto()
 
     def __init__(self, stype):
         if not isinstance(stype, self.special_types):
@@ -47,7 +52,9 @@ class Special(Value):
 
 # Helper with predefined numbers
 class PreDefs:
+    __shared_state = {}
     def __init__(self):
+        self.__dict__ = self.__shared_state
         self.zero = Number()
         self.one = self.zero.inc()
         self.two = self.one.inc()
@@ -61,7 +68,68 @@ class PreDefs:
         self.nine = self.five.add(self.four)
         self.ten = self.five.add(self.five)
 
+        self.neg_one = Number(self.one, Sign.neg)
+
         self.any = Special(Special.special_types.any)
+        self.any_even = Special(Special.special_types.any_even)
+        self.any_odd = Special(Special.special_types.any_odd)
+
+
+class NumberState:
+    def __init__(self, magnitude, sign):
+        # default state is non-negative zero
+        if isinstance(magnitude, Number):
+            self._magnitude = magnitude.state.get_magnitude()
+        elif not isinstance(magnitude, list):
+            raise Exception("NumberState requires either a Number or a Number.integer for the magnitude")
+        else:
+            self._magnitude = magnitude
+        self._sign = sign
+
+    def clone(self):
+        return NumberState(self._magnitude, self._sign)
+
+    def copy(self, state):
+        if not isinstance(state, NumberState):
+            raise Exception("You can only copy a NumberState")
+        self._magnitude = state._magnitude
+        self._sign = state._sign
+
+    def compare_magnitude(self, comparand):
+        for _ in iter(self.get_magnitude()):
+            try:
+                comparand.get_magnitude()[0]
+                comparand = NumberState(comparand.get_magnitude()[1:], self._sign)
+            except Exception as e:
+                return "greater"
+        try:
+            comparand.get_magnitude()[0]
+            return "less"
+        except:
+            return "equal"
+
+    def compare(self, comparand):
+        if not isinstance(comparand, NumberState):
+            raise Exception("You can only compare a NumberState")
+
+        if self._sign != comparand._sign:
+            if self._sign == Sign.pos:
+                return "greater"
+            else:
+                return "less"
+
+        return self.compare_magnitude(comparand)
+
+    def get_magnitude(self):
+        return copy.copy(self._magnitude)
+
+    def get_sign(self):
+        return copy.copy(self._sign)
+
+
+class Sign(Enum):
+    pos = auto()
+    neg = auto()
 
 
 class Number(Value):
@@ -73,53 +141,90 @@ class Number(Value):
     imperative style. (Because that is how I learned how to program?)
     """
 
+    def __init__(self, copy_state=None, sign=Sign.pos):
+        if not isinstance(sign, Sign):
+            raise Exception("If you pass a second param, it must be a Sign")
+        if None is copy_state:
+            self._state = NumberState([], Sign.pos)  # Unary zero
+        else:
+            if isinstance(copy_state, Number):
+                self._state = NumberState(copy_state._state.get_magnitude(), copy_state.state.get_sign())
+                if sign is not None:
+                    self.state._sign = sign
+                return
+            if not isinstance(copy_state, NumberState):
+                raise Exception("Object passed into Number() must be a NumberState.")
+            self._state = copy_state.clone()
+
+
+
+    def clone(self):
+        return copy.deepcopy(self)
+
+
     # Use a property to ensure the state is immutable
     @property
     def state(self):
         return self._state
 
-    def __init__(self, copy_state=None):
-        if None is copy_state:
-            self._state = []  # Unary zero
-        else:
-            self._state = copy_state.copy()
-
     def inc(self):
         # Make a new number that is the previous list + a new element
         # (conscious effort to not use the + operator here even if it
         #  is just a cosmetic distinction)
-        return Number([*self.state, 'x'])
+        # special case 0.  0.inc() is always +1 independent of zero sign
+        if len(self.state.get_magnitude()) == 0:
+            return Number(NumberState(['x'], Sign.pos))
+        if self.state.get_sign() == Sign.neg:
+            return Number(NumberState(self.state.get_magnitude()[1:], Sign.neg))
+        return Number(NumberState([*self.state.get_magnitude(), 'x'], Sign.pos))
 
     def add(self, b):
+        if not isinstance(b, Number):
+            raise Exception("You can only add by Numbers!")
         # 0th iteration is identity
-        result = Number(self.state)
-        for _ in b.state:
-            result = result.inc()
+        result = self.clone()
+        for _ in b.state.get_magnitude():
+            if b.state.get_sign() == Sign.pos:
+                result = result.inc()
+            else:
+                result = result.dec()
         return result
 
     def mul(self, b):
         # 0th iteration is 0
-        result = n_.zero
-        for _ in b.state:
-            result = result.add(self)
+        copy_self = self.clone()
+        if not isinstance(b, Number):
+            raise Exception("You can only mul by Numbers!")
+        result = n_.zero.clone()
+        for _ in b.state.get_magnitude():
+            result = result.add(copy_self)
+        if self._state.get_sign() == b.state.get_sign():
+            result.state._sign = Sign.pos
+        else:
+            result.state._sign = Sign.neg
         return result
 
     def pow(self, b):
-        # 0th iteration is 1
-        result = n_.one
-        for _ in b.state:
+        if not isinstance(b, Number):
+            raise Exception("You can only pow by Numbers!")
+        result = n_.one.clone()
+        for _ in b.state.get_magnitude():
             result = result.mul(self)
+        if b.state.get_sign() == Sign.neg:
+            return n_.one.div(result)
         return result
 
     def tetr(self, b):
+        if not isinstance(b, Number):
+            raise Exception("You can only tetr by Numbers!")
         # Stupid piecewise definition
         if b.compare(n_.zero) == "equal":
             # 0th iteration is 1
             return n_.one
-        result = Number(self.state)
+        result = self.clone()
         once = True
         # For the non-zero tetration case, you loop b - 1 times.
-        for _ in b.state:
+        for _ in b.state.get_magnitude():
             if once:  # Skip the first so do one less
                 once = False
                 continue
@@ -127,29 +232,44 @@ class Number(Value):
         return result
 
     def dec(self):
+        self_copy = self.clone()
         if self.compare(n_.zero) == "equal":
-            raise UnderflowError("Oops.  You tried to decrement a zero.  Just natural numbers for now.")
-        return Number(self.state[1:])
+            return n_.neg_one.clone()
+        if self.state.get_sign() == Sign.pos:
+            return Number(NumberState(self.state.get_magnitude()[1:], Sign.pos))
+        else:
+            return Number(NumberState(Number(self_copy, Sign.pos).inc(), Sign.neg))
 
     def sub(self, s):
-        result = self
-        for _ in s.state:
+        if not isinstance(s, Number):
+            raise Exception("You can only subtract by Numbers!")
+        result = self.clone()
+        for _ in s.state.get_magnitude():
             if result.compare(n_.zero) == "equal":
-                raise UnderflowError(
-                    "Oops.  You tried to subtract a larger number from a smaller one.  Just natural numbers for now.")
-            result = result.dec()
+                # We've exhausted the minuend, so flip the sign and start adding
+                result = Number(NumberState(n_.one._state.get_magnitude(), Sign.neg))
+                continue
+            if s.state.get_sign() == Sign.pos:
+                result = result.dec()
+            else:
+                result = result.inc()
         return result
 
     def div(self, denominator):
-        numerator = Number(self.state)
-        divisions = n_.zero
+        if not isinstance(denominator, Number):
+            raise Exception("You can only divide by Numbers!")
+        numerator = Number(self.clone(), Sign.pos)
+        divisions = n_.zero.clone()
         if denominator.compare(n_.zero) == "equal":
             raise ZeroDivisionError()
+        sign = Sign.pos if self.state.get_sign() == denominator.state.get_sign() else Sign.neg
         while True:
-            progress = n_.zero
-            for _ in denominator.state:
-                if numerator.compare(n_.zero) == "equal":
-                    return divisions, progress
+            progress = n_.zero.clone()
+            if numerator.state.compare_magnitude(n_.zero.state) == "equal":
+                return Number(divisions, sign), progress
+            for _ in denominator.state.get_magnitude():
+                if numerator.state.compare_magnitude(n_.zero.state) == "equal":
+                    return Number(divisions, sign), progress
                 numerator = numerator.dec()
                 progress = progress.inc()
             divisions = divisions.inc()
@@ -159,26 +279,53 @@ class Number(Value):
     #  It is the integer remainder of the next higher magnitude.
     #  As this is a closed form solution, it seems complete enough.
     def log(self, base):
-        numerator = Number(self.state)
-        if base.compare(n_.zero) == "equal":
-            if self.compare(n_.zero) == "equal":
-                return n_.one, n_.zero
-            if self.compare(n_.one) == "equal":
+        if not isinstance(base, Number):
+            raise Exception("You can only log by base Numbers!")
+        self_copy = self.clone()
+        numerator = self.clone()
+        if base.state.compare_magnitude(n_.zero.state) == "equal":
+            if self.state.compare_magnitude(n_.zero.state) == "equal":
+                if self.state.get_sign() == base.state.get_sign():
+                    return n_.one, n_.zero
+                else:
+                    return n_.neg_one, n_.zero
+            if self.state.compare_magnitude(n_.one.state) == "equal":
                 return n_.any, n_.zero
             raise UndefinedError("0^N where N!=[0,1] is always zero, so log base N cannot be calculated.")
         if base.compare(n_.one) == "equal":
             if self.compare(n_.one) == "equal":
                 return n_.any, n_.zero
+            if self.compare(n_.neg_one) == "equal":
+                raise ComplexUnimplemented
             raise UndefinedError()
-        magnitude = n_.zero
+        if base.compare(n_.neg_one) == "equal":
+            if self.compare(n_.one) == "equal":
+                return n_.any_even, n_.zero
+            if self.compare(n_.neg_one) == "equal":
+                return n_.any_odd, n_.zero
+        if self.state.compare_magnitude(n_.zero.state) == "equal":
+            # For log N for base B other than 0,1 (handled above)
+            # given b^x=N  with N=0, there is no value for x where b^x can be 0
+            raise UndefinedError()
+        magnitude = n_.zero.clone()
         while True:
+            if numerator.compare(n_.one) == "equal":
+                remainder = self_copy.sub(base.pow(magnitude))
+                return magnitude, remainder
             numerator, _ = numerator.div(base)
-            if numerator.compare(n_.zero) == "equal":
-                remainder = self.sub(base.pow(magnitude))
+            if numerator.state.compare_magnitude(n_.zero.state) == "equal":
+                pow_result = base.pow(magnitude)
+                remainder = self_copy.sub(pow_result)
+                if pow_result.state.get_sign() == Sign.neg:
+                    raise ComplexUnimplemented
                 return magnitude, remainder
             magnitude = magnitude.inc()
 
+
     def superlog(self, base):
+        if not isinstance(base, Number):
+            raise Exception("You can only superlog by base Numbers!")
+        self_copy = self.clone()
         if base.compare(n_.zero) == "equal":
             if self.compare(n_.zero) == "equal":
                 return n_.any, n_.zero
@@ -188,34 +335,25 @@ class Number(Value):
                 return n_.any, n_.zero
             raise UndefinedError()
         height = n_.one
-        log_progress = Number(self.state)
+        log_progress = self.clone()
         curr_base = base
         while True:
             log_progress, _ = log_progress.log(curr_base)
             if log_progress.compare(n_.zero) == "equal":
-                remainder = self.sub(base.tetr(height))
+                remainder = self_copy.sub(base.tetr(height))
                 return height, remainder
             height = height.inc()
             curr_base = curr_base.mul(curr_base)
 
-
     def compare(self, b):
-        if isinstance(b,Special):
+        if isinstance(b, Special):
             return "not equal"
-        for _ in self.state:
-            try:
-                b.state[0]
-                b = b.dec()
-            except:
-                return "greater"
-        try:
-            b.state[0]
-            return "less"
-        except:
-            return "equal"
+        if not isinstance(b, Number):
+            raise Exception("You can only compare with Specials and Numbers!")
+        return self._state.compare(b._state)
 
     def repr_standard(self):
-        return str(len(self._state))
+        return str(len(self._state.get_magnitude()))
 
 # short name to reduce clutter
 n_ = PreDefs()
