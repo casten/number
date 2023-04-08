@@ -36,6 +36,7 @@ class Special(Value):
         any = auto()
         any_even = auto()
         any_odd = auto()
+        pos_even_not_zero = auto()
 
     def __init__(self, stype):
         if not isinstance(stype, self.special_types):
@@ -73,6 +74,8 @@ class PreDefs:
         self.any = Special(Special.special_types.any)
         self.any_even = Special(Special.special_types.any_even)
         self.any_odd = Special(Special.special_types.any_odd)
+        self.pos_even_not_zero = Special(Special.special_types.pos_even_not_zero)
+
 
 
 class NumberState:
@@ -81,7 +84,7 @@ class NumberState:
         if isinstance(magnitude, Number):
             self._magnitude = magnitude.state.get_magnitude()
         elif not isinstance(magnitude, list):
-            raise Exception("NumberState requires either a Number or a Number.integer for the magnitude")
+            raise Exception("   NumberState requires either a Number or a Number.integer for the magnitude")
         else:
             self._magnitude = magnitude
         self._sign = sign
@@ -285,12 +288,12 @@ class Number(Value):
         numerator = self.clone()
         if base.state.compare_magnitude(n_.zero.state) == "equal":
             if self.state.compare_magnitude(n_.zero.state) == "equal":
-                if self.state.get_sign() == base.state.get_sign():
-                    return n_.one, n_.zero
+                if self.state.get_sign() == Sign.neg:
+                    raise UndefinedError()
                 else:
-                    return n_.neg_one, n_.zero
+                    return n_.pos_even_not_zero, n_.zero
             if self.state.compare_magnitude(n_.one.state) == "equal":
-                return n_.any, n_.zero
+                return n_.zero, n_.zero
             raise UndefinedError("0^N where N!=[0,1] is always zero, so log base N cannot be calculated.")
         if base.compare(n_.one) == "equal":
             if self.compare(n_.one) == "equal":
@@ -330,9 +333,12 @@ class Number(Value):
             if self.compare(n_.zero) == "equal":
                 return n_.any, n_.zero
             raise UndefinedError()
-        if base.compare(n_.one) == "equal":
+        if base.state.compare_magnitude(n_.one.state) == "equal":
             if self.compare(n_.one) == "equal":
-                return n_.any, n_.zero
+                if base.state.get_sign() == Sign.pos:
+                    return n_.any, n_.zero
+                else:
+                    return n_.any_even, n_.zero
             raise UndefinedError()
         height = n_.one
         log_progress = self.clone()

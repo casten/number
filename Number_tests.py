@@ -301,18 +301,28 @@ def standard_tests():
 
 # log
     print("Running Log Tests")
-    # log base 0 is undefined
 
-    # logˇ0(0) = 1, mant=0
-    # This disagrees with many definitions of log, but based on our
-    # definitions, 0^0 = 1, so log base zero of zero is one (, mant=0)
-    assert_val_equal(n_.zero.log(n_.zero)[0].compare(n_.one))
-    assert_val_equal(n_.zero.log(n_.zero)[1].compare(n_.zero))
+    # Anythig to the zero is one
+    # 0^0 = 1
+    # logˇ0(1) = 0
+    one_log_base_0 = n_.one.log(n_.zero)
+    assert_val_equal(one_log_base_0[0].compare(n_.zero))
+    assert_val_equal(one_log_base_0[1].compare(n_.zero))
 
-    # logˇ0(1) = any_value!, mant=0
-    assert_val_equal(n_.one.log(n_.zero)[0].compare(n_.any))
-    assert_val_equal(n_.one.log(n_.zero)[1].compare(n_.zero))
+    # 0^(pos number) = 0
+    # logˇ0(0) = any pos, mant=0
+    zero_log_base_zero = n_.zero.log(n_.zero)
+    assert_val_equal(zero_log_base_zero[0].compare(n_.pos_even_not_zero))
+    assert_val_equal(zero_log_base_zero[1].compare(n_.zero))
 
+
+    # 0^x = 1
+    # logˇ0(1) = 0, mant=0
+    log_one_base_zero = n_.one.log(n_.zero)
+    assert_val_equal(log_one_base_zero[0].compare(n_.zero))
+    assert_val_equal(log_one_base_zero[1].compare(n_.zero))
+
+    # log base 0 is undefined for every value other than 0
     # logˇ0(2) = undefined
     saw_exception = False
     try:
@@ -370,23 +380,23 @@ def standard_tests():
     assert_val_equal(fifteen.log(n_.four)[1].compare(n_.ten.inc()))
 
 
-    # Again, the following base zero logs disagree with many definitions of log, but based on our
-    # definitions, 0^0 = 1, so log base zero of zero is one (, mant=0)
-    # (I have no evidence for the truth of the negative sign, I'll just conserve it)
-    # logˇ-0(0) = -1, mant=0
-    neg_zero_log_base_zero = n_.zero.log(neg_zero)
-    assert_val_equal(neg_zero_log_base_zero[0].compare(n_.neg_one))
-    assert_val_equal(neg_zero_log_base_zero[1].compare(n_.zero))
-
-    # logˇ0(-0) = -1
+    # -0^x = 0
+    # logˇ-0(0) = x, mant=0
+    # x = any pos even except 0
     zero_log_base_neg_zero = n_.zero.log(neg_zero)
-    assert_val_equal(zero_log_base_neg_zero[0].compare(n_.neg_one))
+    assert_val_equal(zero_log_base_neg_zero[0].compare(n_.pos_even_not_zero))
     assert_val_equal(zero_log_base_neg_zero[1].compare(n_.zero))
 
+    # 0^x = -0
+    # logˇ0(-0) = x
+    # x is undefined
+    saw_exception = False
+    try:
+        neg_zero.log(n_.zero)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
 
-    # logˇ0(1) = any_value!, mant=0
-    assert_val_equal(n_.one.log(n_.zero)[0].compare(n_.any))
-    assert_val_equal(n_.one.log(n_.zero)[1].compare(n_.zero))
 
     # logˇ2(0) = undefined
     saw_exception = False
@@ -445,8 +455,24 @@ def standard_tests():
     assert(saw_exception)
 
     # superlogˇ1(1) = any, 0
-    assert_val_equal(n_.one.superlog(n_.one)[0].compare(n_.any))
-    assert_val_equal(n_.one.superlog(n_.one)[1].compare(n_.zero))
+    one_superlog_base_one = n_.one.superlog(n_.one)
+    assert_val_equal(one_superlog_base_one[0].compare(n_.any))
+    assert_val_equal(one_superlog_base_one[1].compare(n_.zero))
+
+    # superlogˇ1(-1) = any, 0
+    saw_exception = False
+    try:
+        neg_one.superlog(n_.one)
+    except UndefinedError as e:
+        saw_exception = True
+    assert(saw_exception)
+
+
+    # superlogˇ-1(1) = n_.any_even, 0
+    one_superlog_base_neg_one = n_.one.superlog(neg_one)
+    assert_val_equal(one_superlog_base_neg_one[0].compare(n_.any_even))
+    assert_val_equal(one_superlog_base_neg_one[1].compare(n_.zero))
+
 
     # superlogˇ1(3) = Undefined Error
     saw_exception = False
